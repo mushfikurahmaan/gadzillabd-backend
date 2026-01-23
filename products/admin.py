@@ -27,6 +27,7 @@ class ProductAdminForm(forms.ModelForm):
 class ProductAdmin(admin.ModelAdmin):
     form = ProductAdminForm
     list_display = ['name', 'brand', 'get_category', 'get_sub_category', 'price', 'stock', 'badge', 'is_featured', 'is_active']
+    list_editable = ['stock']
     list_filter = ['category', 'sub_category', 'badge', 'is_featured', 'is_active']
     search_fields = ['name', 'brand']
     prepopulated_fields = {'slug': ('name',)}
