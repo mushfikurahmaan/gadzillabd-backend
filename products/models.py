@@ -112,6 +112,29 @@ class Product(models.Model):
                 })
 
     def save(self, *args, **kwargs):
+        # Auto-generate slug from name - always update when name changes
+        from django.utils.text import slugify
+        
+        # Always generate slug from current name
+        base_slug = slugify(self.name)
+        
+        if not base_slug:
+            # If name doesn't produce a valid slug, use a fallback
+            base_slug = f"product-{self.id}" if self.pk else "product"
+        
+        self.slug = base_slug
+        
+        # Ensure uniqueness by appending a number if needed
+        queryset = Product.objects.all()
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        
+        counter = 1
+        original_slug = self.slug
+        while queryset.filter(slug=self.slug).exists():
+            self.slug = f"{original_slug}-{counter}"
+            counter += 1
+        
         # Keep model-level validation consistent across admin / scripts.
         self.full_clean()
         return super().save(*args, **kwargs)
