@@ -6,10 +6,10 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     # Remove size from inline; show product name explicitly.
-    fields = ('product', 'product_name', 'quantity', 'price')
+    fields = ('product_name', 'quantity', 'price')
     readonly_fields = ('product_name',)
 
-    @admin.display(description='Product')
+    @admin.display(description='Product name')
     def product_name(self, obj: OrderItem):
         return getattr(obj.product, 'name', '') or str(obj.product_id)
 
@@ -17,16 +17,12 @@ class OrderItemInline(admin.TabularInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     # Phone-based checkout: hide user/email, show phone + delivery area.
-    list_display = ['short_id', 'shipping_name', 'phone', 'delivery_area', 'product_names', 'status', 'total', 'created_at']
+    list_display = ['product_names', 'shipping_name', 'phone', 'delivery_area', 'status', 'total', 'created_at']
     list_filter = ['status', 'created_at']
     inlines = [OrderItemInline]
 
     # Hide fields that aren't used in the manual checkout flow.
     exclude = ('user', 'email')
-
-    @admin.display(description='Order')
-    def short_id(self, obj: Order):
-        return str(obj.id)[:8]
 
     @admin.display(description='Products')
     def product_names(self, obj: Order):
