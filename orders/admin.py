@@ -17,8 +17,9 @@ class OrderItemInline(admin.TabularInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     # Phone-based checkout: hide user/email, show phone + delivery area.
-    list_display = ['product_names', 'shipping_name', 'phone', 'delivery_area', 'status', 'total', 'created_at']
+    list_display = ['product_names', 'quantity', 'shipping_name', 'phone', 'delivery_area', 'status', 'total', 'created_at']
     list_filter = ['status', 'created_at']
+    list_editable = ['status']  # Allow editing status directly from the list view
     inlines = [OrderItemInline]
 
     # Hide fields that aren't used in the manual checkout flow.
