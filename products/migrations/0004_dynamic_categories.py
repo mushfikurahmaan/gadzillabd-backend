@@ -1,6 +1,6 @@
 # Generated migration for dynamic categories
 
-from django.db import migrations, models
+from django.db import migrations, models, transaction
 import django.db.models.deletion
 
 
@@ -8,61 +8,62 @@ def create_initial_categories(apps, schema_editor):
     """Create initial category structure with Gadgets and Accessories."""
     Category = apps.get_model('products', 'Category')
     
-    # Create main categories
-    gadgets = Category.objects.create(
-        name='Gadgets',
-        slug='gadgets',
-        description='Discover the latest in tech innovation with our curated gadgets collection.',
-        order=1,
-        is_active=True,
-    )
-    
-    accessories = Category.objects.create(
-        name='Accessories',
-        slug='accessories',
-        description='Elevate your tech experience with our premium accessories collection.',
-        order=2,
-        is_active=True,
-    )
-    
-    # Create Gadgets subcategories
-    gadgets_subcats = [
-        ('New In', 'new', 1),
-        ('Audio', 'audio', 2),
-        ('Wearables', 'wearables', 3),
-        ('Smart Home', 'smart-home', 4),
-        ('Gaming', 'gaming', 5),
-        ('Cameras', 'cameras', 6),
-        ('Drones', 'drones', 7),
-    ]
-    
-    for name, slug, order in gadgets_subcats:
-        Category.objects.create(
-            name=name,
-            slug=slug,
-            parent=gadgets,
-            order=order,
+    with transaction.atomic():
+        # Create main categories
+        gadgets = Category.objects.create(
+            name='Gadgets',
+            slug='gadgets',
+            description='Discover the latest in tech innovation with our curated gadgets collection.',
+            order=1,
             is_active=True,
         )
-    
-    # Create Accessories subcategories (without Cases & Covers, Screen Protectors, Bags & Sleeves)
-    # Adding Power Bank as requested
-    accessories_subcats = [
-        ('New In', 'accessories-new', 1),  # Use unique slug to avoid conflict with gadgets
-        ('Chargers', 'chargers', 2),
-        ('Cables', 'cables', 3),
-        ('Stands & Mounts', 'stands', 4),
-        ('Power Bank', 'power-bank', 5),  # New category as requested
-    ]
-    
-    for name, slug, order in accessories_subcats:
-        Category.objects.create(
-            name=name,
-            slug=slug,
-            parent=accessories,
-            order=order,
+        
+        accessories = Category.objects.create(
+            name='Accessories',
+            slug='accessories',
+            description='Elevate your tech experience with our premium accessories collection.',
+            order=2,
             is_active=True,
         )
+        
+        # Create Gadgets subcategories
+        gadgets_subcats = [
+            ('New In', 'new', 1),
+            ('Audio', 'audio', 2),
+            ('Wearables', 'wearables', 3),
+            ('Smart Home', 'smart-home', 4),
+            ('Gaming', 'gaming', 5),
+            ('Cameras', 'cameras', 6),
+            ('Drones', 'drones', 7),
+        ]
+        
+        for name, slug, order in gadgets_subcats:
+            Category.objects.create(
+                name=name,
+                slug=slug,
+                parent=gadgets,
+                order=order,
+                is_active=True,
+            )
+        
+        # Create Accessories subcategories (without Cases & Covers, Screen Protectors, Bags & Sleeves)
+        # Adding Power Bank as requested
+        accessories_subcats = [
+            ('New In', 'accessories-new', 1),  # Use unique slug to avoid conflict with gadgets
+            ('Chargers', 'chargers', 2),
+            ('Cables', 'cables', 3),
+            ('Stands & Mounts', 'stands', 4),
+            ('Power Bank', 'power-bank', 5),  # New category as requested
+        ]
+        
+        for name, slug, order in accessories_subcats:
+            Category.objects.create(
+                name=name,
+                slug=slug,
+                parent=accessories,
+                order=order,
+                is_active=True,
+            )
 
 
 def migrate_product_categories(apps, schema_editor):
@@ -70,59 +71,64 @@ def migrate_product_categories(apps, schema_editor):
     Product = apps.get_model('products', 'Product')
     Category = apps.get_model('products', 'Category')
     
-    # Build lookup maps
-    main_categories = {c.slug: c for c in Category.objects.filter(parent__isnull=True)}
-    sub_categories = {c.slug: c for c in Category.objects.filter(parent__isnull=False)}
-    
-    # Map old sub_category values to new slugs
-    old_to_new_subcat = {
-        'new': 'new',  # For gadgets
-        'audio': 'audio',
-        'wearables': 'wearables',
-        'smart-home': 'smart-home',
-        'gaming': 'gaming',
-        'cameras': 'cameras',
-        'drones': 'drones',
-        'chargers': 'chargers',
-        'cables': 'cables',
-        'stands': 'stands',
-        # Removed categories - products will have sub_category set to null
-        'cases': None,
-        'screen-protectors': None,
-        'bags': None,
-    }
-    
-    for product in Product.objects.all():
-        # Get the main category
-        old_cat = getattr(product, 'category_old', None) or getattr(product, 'category', None)
-        if isinstance(old_cat, str):
-            main_cat = main_categories.get(old_cat)
-            if main_cat:
-                product.category_new = main_cat
+    with transaction.atomic():
+        # Build lookup maps
+        main_categories = {c.slug: c for c in Category.objects.filter(parent__isnull=True)}
+        sub_categories = {c.slug: c for c in Category.objects.filter(parent__isnull=False)}
         
-        # Get the subcategory
-        old_subcat = getattr(product, 'sub_category_old', None) or getattr(product, 'sub_category', None)
-        if isinstance(old_subcat, str) and old_subcat:
-            new_subcat_slug = old_to_new_subcat.get(old_subcat)
-            if new_subcat_slug:
-                # Handle "new" which exists in both gadgets and accessories
-                if new_subcat_slug == 'new':
-                    if old_cat == 'accessories':
-                        new_subcat_slug = 'accessories-new'
-                sub_cat = sub_categories.get(new_subcat_slug)
-                if sub_cat:
-                    product.sub_category_new = sub_cat
+        # Map old sub_category values to new slugs
+        old_to_new_subcat = {
+            'new': 'new',  # For gadgets
+            'audio': 'audio',
+            'wearables': 'wearables',
+            'smart-home': 'smart-home',
+            'gaming': 'gaming',
+            'cameras': 'cameras',
+            'drones': 'drones',
+            'chargers': 'chargers',
+            'cables': 'cables',
+            'stands': 'stands',
+            # Removed categories - products will have sub_category set to null
+            'cases': None,
+            'screen-protectors': None,
+            'bags': None,
+        }
         
-        product.save()
+        for product in Product.objects.all():
+            # Get the main category
+            old_cat = getattr(product, 'category_old', None) or getattr(product, 'category', None)
+            if isinstance(old_cat, str):
+                main_cat = main_categories.get(old_cat)
+                if main_cat:
+                    product.category_new = main_cat
+            
+            # Get the subcategory
+            old_subcat = getattr(product, 'sub_category_old', None) or getattr(product, 'sub_category', None)
+            if isinstance(old_subcat, str) and old_subcat:
+                new_subcat_slug = old_to_new_subcat.get(old_subcat)
+                if new_subcat_slug:
+                    # Handle "new" which exists in both gadgets and accessories
+                    if new_subcat_slug == 'new':
+                        if old_cat == 'accessories':
+                            new_subcat_slug = 'accessories-new'
+                    sub_cat = sub_categories.get(new_subcat_slug)
+                    if sub_cat:
+                        product.sub_category_new = sub_cat
+            
+            product.save()
 
 
 def reverse_migration(apps, schema_editor):
     """Reverse the category migration."""
     Category = apps.get_model('products', 'Category')
-    Category.objects.all().delete()
+    with transaction.atomic():
+        Category.objects.all().delete()
 
 
 class Migration(migrations.Migration):
+    # Disable atomic transactions to avoid PostgreSQL trigger conflicts
+    # when performing multiple schema changes on the same table
+    atomic = False
 
     dependencies = [
         ('products', '0003_alter_product_category'),
