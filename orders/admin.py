@@ -9,6 +9,10 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'email', 'user', 'status', 'total', 'created_at']
+    # Phone-based checkout: hide user/email, show phone + delivery area.
+    list_display = ['id', 'phone', 'delivery_area', 'status', 'total', 'created_at']
     list_filter = ['status', 'created_at']
     inlines = [OrderItemInline]
+
+    # Hide fields that aren't used in the manual checkout flow.
+    exclude = ('user', 'email')

@@ -23,7 +23,8 @@ class Order(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='orders'
     )
-    email = models.EmailField()
+    # Email is optional; checkout is phone-based for guests.
+    email = models.EmailField(blank=True, default='')
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
     )
@@ -32,7 +33,16 @@ class Order(models.Model):
     shipping_name = models.CharField(max_length=255, blank=True)
     shipping_address = models.TextField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
-    delivery_area = models.CharField(max_length=50, blank=True)
+    class DeliveryArea(models.TextChoices):
+        INSIDE = 'inside', 'Inside Dhaka City'
+        OUTSIDE = 'outside', 'Outside Dhaka City'
+
+    delivery_area = models.CharField(
+        max_length=50,
+        choices=DeliveryArea.choices,
+        default=DeliveryArea.INSIDE,
+        blank=True,
+    )
     tracking_number = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -41,7 +51,8 @@ class Order(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Order {str(self.id)[:8]} - {self.email}"
+        ident = (self.phone or self.email or '').strip() or 'guest'
+        return f"Order {str(self.id)[:8]} - {ident}"
 
 
 class OrderItem(models.Model):

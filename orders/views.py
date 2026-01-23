@@ -147,9 +147,10 @@ class DirectOrderCreateView(CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Generate email from phone (using phone as email for now, or use a default)
-        # In production, you might want to add an email field to the form
-        email = f"{ser.validated_data['phone']}@gadzilla.local"
+        # Phone-based checkout: email is optional (use user's email if authenticated).
+        email = ''
+        if request.user.is_authenticated:
+            email = (getattr(request.user, 'email', '') or '').strip()
         
         # Calculate shipping cost
         delivery_area = ser.validated_data['delivery_area']

@@ -15,12 +15,14 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    delivery_area_label = serializers.CharField(source='get_delivery_area_display', read_only=True)
 
     class Meta:
         model = Order
         fields = [
-            'id', 'email', 'status', 'total', 'shipping_name', 'shipping_address',
-            'phone', 'delivery_area', 'tracking_number', 'created_at', 'updated_at', 'items',
+            'id', 'status', 'total', 'shipping_name', 'shipping_address',
+            'phone', 'delivery_area', 'delivery_area_label',
+            'tracking_number', 'created_at', 'updated_at', 'items',
         ]
 
 
@@ -45,7 +47,7 @@ class DirectOrderCreateSerializer(serializers.Serializer):
     shipping_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(max_length=20)
     shipping_address = serializers.CharField()
-    delivery_area = serializers.CharField(max_length=50)
+    delivery_area = serializers.ChoiceField(choices=['inside', 'outside'])
     products = serializers.ListField(
         child=serializers.DictField(),
         min_length=1
