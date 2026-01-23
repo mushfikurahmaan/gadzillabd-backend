@@ -31,6 +31,8 @@ class Order(models.Model):
     # Snapshot of shipping for display
     shipping_name = models.CharField(max_length=255, blank=True)
     shipping_address = models.TextField(blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    delivery_area = models.CharField(max_length=50, blank=True)
     tracking_number = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

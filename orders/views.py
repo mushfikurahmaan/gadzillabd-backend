@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from cart.views import get_or_create_cart
 
 from .models import Order, OrderItem
-from .serializers import OrderCreateSerializer, OrderSerializer
+from .serializers import OrderCreateSerializer, OrderSerializer, DirectOrderCreateSerializer
 
 
 class OrderCreateView(CreateAPIView):
@@ -79,6 +79,110 @@ class OrderCreateView(CreateAPIView):
         order.total = total
         order.save(update_fields=['total'])
         cart.items.all().delete()
+        return Response(
+            OrderSerializer(instance=order, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class DirectOrderCreateView(CreateAPIView):
+    """Create order directly with products (not from cart)."""
+    serializer_class = DirectOrderCreateSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        
+        products_data = ser.validated_data['products']
+        if not products_data:
+            return Response(
+                {'detail': 'No products provided.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get products with locked rows for atomic stock updates
+        from products.models import Product
+        import uuid as uuid_lib
+        product_ids = []
+        validation_errors = []
+        for p in products_data:
+            try:
+                product_ids.append(uuid_lib.UUID(p['id']))
+            except (ValueError, TypeError):
+                validation_errors.append(f"Invalid product ID: {p['id']}")
+        
+        if validation_errors:
+            return Response(
+                {'detail': 'Invalid product data.', 'errors': validation_errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        locked_products = {
+            str(p.id): p for p in Product.objects.filter(
+                id__in=product_ids
+            ).select_for_update()
+        }
+        
+        # Check stock availability
+        stock_errors = []
+        for product_data in products_data:
+            product_id_str = str(product_data['id'])
+            quantity = product_data['quantity']
+            product = locked_products.get(product_id_str)
+            if not product:
+                stock_errors.append(f"Product {product_id_str} not found.")
+                continue
+            if product.stock < quantity:
+                stock_errors.append(
+                    f"Insufficient stock for {product.name}. "
+                    f"Available: {product.stock}, Requested: {quantity}"
+                )
+        
+        if stock_errors:
+            return Response(
+                {'detail': 'Stock validation failed.', 'errors': stock_errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate email from phone (using phone as email for now, or use a default)
+        # In production, you might want to add an email field to the form
+        email = f"{ser.validated_data['phone']}@gadzilla.local"
+        
+        # Calculate shipping cost
+        delivery_area = ser.validated_data['delivery_area']
+        shipping_cost = Decimal('40.00') if delivery_area == 'inside' else Decimal('150.00')
+        
+        # Create order and reduce stock
+        total = Decimal('0.00')
+        order = Order.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            email=email,
+            shipping_name=ser.validated_data['shipping_name'],
+            shipping_address=ser.validated_data['shipping_address'],
+            phone=ser.validated_data['phone'],
+            delivery_area=ser.validated_data['delivery_area'],
+        )
+        
+        for product_data in products_data:
+            product_id_str = str(product_data['id'])
+            quantity = product_data['quantity']
+            product = locked_products[product_id_str]
+            price = product.price
+            OrderItem.objects.create(
+                order=order, product=product, quantity=quantity,
+                size='', price=price
+            )
+            # Reduce stock atomically
+            product.stock -= quantity
+            product.save(update_fields=['stock'])
+            total += price * quantity
+        
+        # Add shipping cost
+        total += shipping_cost
+        order.total = total
+        order.save(update_fields=['total'])
+        
         return Response(
             OrderSerializer(instance=order, context={'request': request}).data,
             status=status.HTTP_201_CREATED
