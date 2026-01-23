@@ -88,6 +88,8 @@ class OrderCreateView(CreateAPIView):
 class DirectOrderCreateView(CreateAPIView):
     """Create order directly with products (not from cart)."""
     serializer_class = DirectOrderCreateSerializer
+    permission_classes = []  # Allow unauthenticated access
+    authentication_classes = []  # No authentication required
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
