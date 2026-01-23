@@ -26,12 +26,27 @@ class ProductAdminForm(forms.ModelForm):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     form = ProductAdminForm
-    list_display = ['name', 'brand', 'get_category', 'get_sub_category', 'price', 'badge', 'is_featured', 'is_active']
+    list_display = ['name', 'brand', 'get_category', 'get_sub_category', 'price', 'stock', 'badge', 'is_featured', 'is_active']
     list_filter = ['category', 'sub_category', 'badge', 'is_featured', 'is_active']
     search_fields = ['name', 'brand']
     prepopulated_fields = {'slug': ('name',)}
     inlines = [ProductImageInline]
     autocomplete_fields = ['category', 'sub_category']
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'brand', 'slug', 'category', 'sub_category')
+        }),
+        ('Pricing', {
+            'fields': ('price', 'original_price', 'badge')
+        }),
+        ('Media', {
+            'fields': ('image',)
+        }),
+        ('Additional Information', {
+            'fields': ('description', 'stock', 'is_featured', 'is_active')
+        }),
+    )
+    change_form_template = 'admin/products/product/change_form.html'
 
     def get_category(self, obj):
         return obj.category.name if obj.category else '-'

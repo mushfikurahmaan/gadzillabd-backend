@@ -1,0 +1,33 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script type="text/javascript">
+(function($) {
+    $(document).ready(function() {
+        // Find the ProductImage inline section
+        var inlineSection = $('#productimage_set-group');
+        
+        if (inlineSection.length) {
+            // Find the Media fieldset (contains the image field)
+            var mediaFieldset = $('fieldset:has(legend:contains("Media"))');
+            
+            if (mediaFieldset.length) {
+                // Move the inline section right after the Media fieldset
+                mediaFieldset.after(inlineSection);
+            } else {
+                // Fallback: find by the image input field
+                var imageInput = $('input[name="image"]');
+                if (imageInput.length) {
+                    var imageFieldset = imageInput.closest('fieldset');
+                    if (imageFieldset.length) {
+                        imageFieldset.after(inlineSection);
+                    }
+                }
+            }
+        }
+    });
+})(django.jQuery);
+</script>
+{% endblock %}
