@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db import transaction
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveAPIView
@@ -16,6 +17,7 @@ class OrderCreateView(CreateAPIView):
     """Create order from current cart."""
     serializer_class = OrderCreateSerializer
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -26,6 +28,36 @@ class OrderCreateView(CreateAPIView):
                 {'detail': 'Cart is empty.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Get products with locked rows for atomic stock updates
+        from products.models import Product
+        product_ids = [ci.product_id for ci in items]
+        locked_products = {
+            p.id: p for p in Product.objects.filter(
+                id__in=product_ids
+            ).select_for_update()
+        }
+        
+        # Check stock availability
+        stock_errors = []
+        for ci in items:
+            product = locked_products.get(ci.product_id)
+            if not product:
+                stock_errors.append(f"Product {ci.product.name} not found.")
+                continue
+            if product.stock < ci.quantity:
+                stock_errors.append(
+                    f"Insufficient stock for {product.name}. "
+                    f"Available: {product.stock}, Requested: {ci.quantity}"
+                )
+        
+        if stock_errors:
+            return Response(
+                {'detail': 'Stock validation failed.', 'errors': stock_errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create order and reduce stock
         total = Decimal('0.00')
         order = Order.objects.create(
             user=request.user if request.user.is_authenticated else None,
@@ -34,11 +66,15 @@ class OrderCreateView(CreateAPIView):
             shipping_address=ser.validated_data['shipping_address'],
         )
         for ci in items:
-            price = ci.product.price
+            product = locked_products[ci.product_id]
+            price = product.price
             OrderItem.objects.create(
-                order=order, product=ci.product, quantity=ci.quantity,
+                order=order, product=product, quantity=ci.quantity,
                 size=ci.size or '', price=price
             )
+            # Reduce stock atomically
+            product.stock -= ci.quantity
+            product.save(update_fields=['stock'])
             total += price * ci.quantity
         order.total = total
         order.save(update_fields=['total'])

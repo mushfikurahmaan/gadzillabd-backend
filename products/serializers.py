@@ -36,7 +36,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'name', 'brand', 'price', 'originalPrice', 'image',
-            'badge', 'category', 'subCategory', 'slug',
+            'badge', 'category', 'subCategory', 'slug', 'stock',
         ]
 
     def get_image(self, obj):
@@ -64,7 +64,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'brand', 'slug', 'price', 'originalPrice', 'image', 'images',
             'badge', 'category', 'subCategory', 'description',
-            'is_featured', 'created_at',
+            'is_featured', 'created_at', 'stock',
         ]
 
     def get_image(self, obj):

@@ -83,6 +83,10 @@ class Product(models.Model):
         help_text="Subcategory (e.g., Audio, Chargers, Power Bank)"
     )
     description = models.TextField(blank=True)
+    stock = models.PositiveIntegerField(
+        default=0,
+        help_text="Available stock quantity for this product"
+    )
     is_featured = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -24,3 +24,6 @@ staticfiles/
 # Env
 .env
 .env.local
+
+# Others
+db.sh
