@@ -195,3 +195,24 @@ STORAGES = {
         'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
+
+
+# =============================================================================
+# EMAIL CONFIGURATION (Gmail SMTP)
+# =============================================================================
+
+# Email backend - defaults to console for development if not configured
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+# Email address to receive order notifications
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
+# Default "from" email address (uses EMAIL_HOST_USER if not set)
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+SERVER_EMAIL = EMAIL_HOST_USER  # For error reporting
