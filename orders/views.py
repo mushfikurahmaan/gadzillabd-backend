@@ -11,7 +11,7 @@ from cart.views import get_or_create_cart
 
 from .models import Order, OrderItem
 from .serializers import OrderCreateSerializer, OrderSerializer, DirectOrderCreateSerializer
-from .utils import send_order_notification_email
+# from .utils import send_order_notification_email  # Disabled - email functionality removed
 
 
 class OrderCreateView(CreateAPIView):
@@ -81,14 +81,8 @@ class OrderCreateView(CreateAPIView):
         order.save(update_fields=['total'])
         cart.items.all().delete()
         
-        # Send email notification (non-blocking - order creation succeeds even if email fails)
-        try:
-            # Prefetch order items for email template
-            order = Order.objects.prefetch_related('items__product').get(id=order.id)
-            send_order_notification_email(order)
-        except Exception:
-            # Email failure should not affect order creation
-            pass
+        # Email notification disabled - removed for now
+        # TODO: Re-enable when email service is configured
         
         return Response(
             OrderSerializer(instance=order, context={'request': request}).data,
@@ -197,14 +191,8 @@ class DirectOrderCreateView(CreateAPIView):
         order.total = total
         order.save(update_fields=['total'])
         
-        # Send email notification (non-blocking - order creation succeeds even if email fails)
-        try:
-            # Prefetch order items for email template
-            order = Order.objects.prefetch_related('items__product').get(id=order.id)
-            send_order_notification_email(order)
-        except Exception:
-            # Email failure should not affect order creation
-            pass
+        # Email notification disabled - removed for now
+        # TODO: Re-enable when email service is configured
         
         return Response(
             OrderSerializer(instance=order, context={'request': request}).data,

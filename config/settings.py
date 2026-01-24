@@ -198,20 +198,5 @@ STORAGES = {
 
 
 # =============================================================================
-# EMAIL CONFIGURATION (Gmail SMTP)
+# EMAIL CONFIGURATION (Disabled)
 # =============================================================================
-
-# Email backend - defaults to console for development if not configured
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND')
-EMAIL_HOST = os.environ.get('EMAIL_HOST')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT')) if os.environ.get('EMAIL_PORT') else None
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False').lower() == 'true'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-# Email timeout in seconds (prevents hanging on SMTP connection)
-EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '5'))
-# Email address to receive order notifications
-ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
-# Default "from" email address (uses EMAIL_HOST_USER if not set)
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-SERVER_EMAIL = EMAIL_HOST_USER  # For error reporting
