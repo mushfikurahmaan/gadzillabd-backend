@@ -2,6 +2,8 @@
 Utility functions for order-related operations.
 """
 import logging
+import threading
+import socket
 from decimal import Decimal
 from django.conf import settings
 from django.core.mail import send_mail
@@ -11,25 +13,61 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def _send_email_sync(order_id, admin_email, subject, plain_message, html_message, from_email):
+    """
+    Internal function to send email synchronously with timeout handling.
+    This is called from a background thread.
+    """
+    try:
+        # Set socket timeout to prevent hanging
+        email_timeout = getattr(settings, 'EMAIL_TIMEOUT', 5)
+        original_timeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(email_timeout)
+        
+        try:
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=from_email,
+                recipient_list=[admin_email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            logger.info(f"Order notification email sent successfully for order {order_id} to {admin_email}")
+            return True
+        finally:
+            # Restore original timeout
+            socket.setdefaulttimeout(original_timeout)
+            
+    except (socket.timeout, socket.error, OSError) as e:
+        logger.error(f"SMTP connection timeout/error for order {order_id}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send order notification email for order {order_id}: {str(e)}", exc_info=True)
+        return False
+
+
 def send_order_notification_email(order):
     """
     Send email notification to admin when a new order is placed.
+    This function sends the email asynchronously in a background thread
+    to prevent blocking the order creation request.
     
     Args:
         order: Order instance with related items loaded
         
     Returns:
-        bool: True if email was sent successfully, False otherwise
+        None (always returns immediately, email is sent in background)
     """
     # Check if admin email is configured
     admin_email = getattr(settings, 'ADMIN_EMAIL', '').strip()
     if not admin_email:
         logger.warning("ADMIN_EMAIL not configured. Skipping order notification email.")
-        return False
+        return
     
     # Check if email backend is configured (not console backend)
-    email_backend = getattr(settings, 'EMAIL_BACKEND', '')
-    if 'console' in email_backend.lower():
+    email_backend = getattr(settings, 'EMAIL_BACKEND', '') or ''
+    if email_backend and 'console' in email_backend.lower():
         logger.info(f"Email backend is console. Order notification would be sent to: {admin_email}")
         # Still proceed to render and log the email content
     
@@ -116,23 +154,19 @@ Subtotal: ৳{context['subtotal']}
             plain_message += f"Shipping: ৳{context['shipping_cost']}\n"
         plain_message += f"Total: ৳{context['total']}"
         
-        # Send email
+        # Prepare email parameters
         subject = f"New Order #{context['order_id_short']} - {context['customer_name']}"
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', settings.EMAIL_HOST_USER)
         
-        send_mail(
-            subject=subject,
-            message=plain_message,
-            from_email=from_email,
-            recipient_list=[admin_email],
-            html_message=html_message,
-            fail_silently=False,  # We'll catch exceptions ourselves
+        # Send email in background thread to avoid blocking the request
+        thread = threading.Thread(
+            target=_send_email_sync,
+            args=(order.id, admin_email, subject, plain_message, html_message, from_email),
+            daemon=True  # Daemon thread so it doesn't prevent app shutdown
         )
-        
-        logger.info(f"Order notification email sent successfully for order {order.id} to {admin_email}")
-        return True
+        thread.start()
+        logger.info(f"Order notification email queued for order {order.id} (sending in background)")
         
     except Exception as e:
         # Log the error but don't fail the order creation
-        logger.error(f"Failed to send order notification email for order {order.id}: {str(e)}", exc_info=True)
-        return False
+        logger.error(f"Failed to prepare order notification email for order {order.id}: {str(e)}", exc_info=True)
