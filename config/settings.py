@@ -205,7 +205,7 @@ STORAGES = {
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND')
 EMAIL_HOST = os.environ.get('EMAIL_HOST')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT')) if os.environ.get('EMAIL_PORT') else None
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 # Email timeout in seconds (prevents hanging on SMTP connection)
