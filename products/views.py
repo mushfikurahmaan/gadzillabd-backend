@@ -6,11 +6,11 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Brand, Category, Product
+from .models import Brand, Category, NavbarCategory, Product
 from .serializers import (
     BrandSerializer,
     CategorySerializer,
-    CategoryFlatSerializer,
+    NavbarCategorySerializer,
     SubcategorySerializer,
     ProductDetailSerializer,
     ProductListSerializer,
@@ -26,33 +26,29 @@ class ProductListView(ListAPIView):
         category = self.request.query_params.get('category')
         subcategory = self.request.query_params.get('subcategory')
         brand = self.request.query_params.get('brand')
-        
+
         if category:
-            # Support comma-separated category slugs, e.g. category=gadgets,accessories
+            # Support comma-separated navbar category slugs
             category_slugs = [c.strip() for c in category.split(',') if c.strip()]
             if category_slugs:
-                # Filter by main category slug(s)
                 qs = qs.filter(category__slug__in=category_slugs)
-        
+
         if subcategory:
-            # Filter by subcategory slug
             qs = qs.filter(sub_category__slug=subcategory)
-        
+
         if brand:
-            # Support comma-separated brands
             brands = [b.strip() for b in brand.split(',') if b.strip()]
             if brands:
                 qs = qs.filter(brand__in=brands)
-        
+
         featured = self.request.query_params.get('featured')
         if featured and featured.lower() == 'true':
             qs = qs.filter(is_featured=True)
-        
-        # Hot deals: badge=sale
+
         hot_deals = self.request.query_params.get('hot_deals')
         if hot_deals and hot_deals.lower() == 'true':
             qs = qs.filter(badge='sale')
-        
+
         return qs
 
 
@@ -96,58 +92,79 @@ class ProductRelatedView(ListAPIView):
         )
 
 
+class NavbarCategoryListView(ListAPIView):
+    """
+    List all active navbar categories with their subcategories.
+    Used by the frontend for navigation and category pages.
+    """
+    serializer_class = NavbarCategorySerializer
+
+    def get_queryset(self):
+        return NavbarCategory.objects.filter(
+            is_active=True
+        ).prefetch_related('subcategories')
+
+
+class NavbarCategoryDetailView(RetrieveAPIView):
+    """Get a single navbar category by slug, including its subcategories."""
+    serializer_class = NavbarCategorySerializer
+    lookup_field = 'slug'
+
+    def get_queryset(self):
+        return NavbarCategory.objects.filter(is_active=True).prefetch_related('subcategories')
+
+
 class CategoryListView(ListAPIView):
     """
-    List main categories with their subcategories for navigation.
-    Returns only active, top-level categories with nested subcategories.
+    List subcategories, optionally filtered by navbar category slug.
+    Pass ?navbar_category=<slug> to get subcategories for a specific navbar category.
     """
     serializer_class = CategorySerializer
-    
+
     def get_queryset(self):
-        return Category.objects.filter(
-            parent__isnull=True,
-            is_active=True
-        ).prefetch_related('children')
+        qs = Category.objects.filter(is_active=True).select_related('navbar_category')
+        navbar_slug = self.request.query_params.get('navbar_category')
+        if navbar_slug:
+            qs = qs.filter(navbar_category__slug=navbar_slug)
+        return qs
 
 
 class CategoryDetailView(RetrieveAPIView):
-    """Get a single category by slug with its subcategories."""
+    """Get a single subcategory by slug."""
     serializer_class = CategorySerializer
     lookup_field = 'slug'
-    
+
     def get_queryset(self):
-        return Category.objects.filter(is_active=True).prefetch_related('children')
+        return Category.objects.filter(is_active=True).select_related('navbar_category')
 
 
 class SubcategoryListView(ListAPIView):
-    """List subcategories for a given main category slug."""
+    """List subcategories for a given navbar category slug."""
     serializer_class = SubcategorySerializer
-    
+
     def get_queryset(self):
         parent_slug = self.kwargs.get('parent_slug')
         return Category.objects.filter(
-            parent__slug=parent_slug,
+            navbar_category__slug=parent_slug,
             is_active=True
         ).order_by('order', 'name')
 
 
 class BrandListView(APIView):
     """
-    List all unique product brands, optionally filtered by category.
+    List all unique product brands, optionally filtered by navbar category.
     Returns brand names sorted alphabetically.
-    Note: This returns brand names from products, not Brand model instances.
     """
     def get(self, request):
         category_slug = request.query_params.get('category')
-        
+
         qs = Product.objects.filter(is_active=True)
-        
+
         if category_slug:
             qs = qs.filter(category__slug=category_slug)
-        
-        # Get unique brands
+
         brands = qs.values_list('brand', flat=True).distinct().order_by('brand')
-        
+
         return Response(list(brands))
 
 
@@ -155,16 +172,15 @@ class BrandShowcaseView(APIView):
     """
     List all active brands for the homepage showcase.
     Can filter by brand_type (accessories, gadgets) using query parameter.
-    Returns brands ordered by their order field.
     """
     def get(self, request):
         brand_type = request.query_params.get('type')
-        
+
         qs = Brand.objects.filter(is_active=True)
-        
+
         if brand_type:
             qs = qs.filter(brand_type=brand_type)
-        
+
         serializer = BrandSerializer(qs, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -173,26 +189,23 @@ class ProductSearchView(ListAPIView):
     """
     Real-time product search endpoint.
     Searches product name, brand, and description fields.
-    Returns matching products sorted by relevance.
     """
     serializer_class = ProductListSerializer
 
     def get_queryset(self):
         query = self.request.query_params.get('q', '').strip()
-        
+
         if not query or len(query) < 2:
             return Product.objects.none()
-        
+
         qs = Product.objects.filter(is_active=True).select_related(
             'category', 'sub_category'
         ).prefetch_related('images')
-        
-        # Search in name, brand, and description
+
         qs = qs.filter(
             Q(name__icontains=query) |
             Q(brand__icontains=query) |
             Q(description__icontains=query)
         )
-        
-        # Order by name match first (more relevant), then by name
-        return qs.order_by('name')[:10]  # Limit to 10 results for performance
+
+        return qs.order_by('name')[:10]

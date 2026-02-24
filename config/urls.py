@@ -1,20 +1,27 @@
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib import admin
 from django.urls import include, path
+
+from config.admin_site import custom_admin_site
 
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from products.urls import category_urlpatterns, brands_urlpatterns, brand_showcase_urlpatterns
+from products.urls import (
+    navbar_category_urlpatterns,
+    category_urlpatterns,
+    brands_urlpatterns,
+    brand_showcase_urlpatterns,
+)
 
 urlpatterns = [
     # Admin URL is configurable via ADMIN_URL_PATH environment variable
-    path(settings.ADMIN_URL_PATH, admin.site.urls),
-    # Auth (JWT) – for future use with Next.js; can add Google token verification later
+    path(settings.ADMIN_URL_PATH, custom_admin_site.urls),
+    # Auth (JWT)
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     # API
     path('api/products/', include('products.urls')),
+    path('api/navbar-categories/', include(navbar_category_urlpatterns)),
     path('api/categories/', include(category_urlpatterns)),
     path('api/brands/', include(brands_urlpatterns)),
     path('api/brand-showcase/', include(brand_showcase_urlpatterns)),

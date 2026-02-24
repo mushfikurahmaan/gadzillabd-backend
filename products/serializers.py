@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Brand, Category, Product, ProductImage
+from .models import Brand, Category, NavbarCategory, Product, ProductImage
 
 
 def _image_url(img, request):
@@ -28,7 +28,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         source='original_price', max_digits=10, decimal_places=2,
         read_only=True, allow_null=True
     )
-    # Return category slug for frontend compatibility
+    # Return navbar category slug for frontend URL generation
     category = serializers.SlugRelatedField(slug_field='slug', read_only=True)
     subCategory = serializers.SerializerMethodField()
 
@@ -55,7 +55,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         source='original_price', max_digits=10, decimal_places=2,
         read_only=True, allow_null=True
     )
-    # Return category and subcategory slugs for frontend compatibility
+    # Return navbar category and subcategory slugs for frontend compatibility
     category = serializers.SlugRelatedField(slug_field='slug', read_only=True)
     subCategory = serializers.SerializerMethodField()
 
@@ -80,7 +80,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
 
 class SubcategorySerializer(serializers.ModelSerializer):
-    """Serializer for subcategories (children of main categories)."""
+    """Serializer for subcategories (children of a NavbarCategory)."""
     href = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
 
@@ -89,23 +89,21 @@ class SubcategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'image', 'href', 'order']
 
     def get_href(self, obj):
-        """Generate URL for subcategory: /parent-slug?type=subcategory-slug"""
-        if obj.parent:
-            return f"/{obj.parent.slug}?type={obj.slug}"
-        return f"/{obj.slug}"
+        """Generate URL: /navbar-category-slug?type=subcategory-slug"""
+        return f"/{obj.navbar_category.slug}?type={obj.slug}"
 
     def get_image(self, obj):
         return _image_url(obj.image, self.context.get('request'))
 
 
-class CategorySerializer(serializers.ModelSerializer):
-    """Serializer for main categories with nested subcategories."""
+class NavbarCategorySerializer(serializers.ModelSerializer):
+    """Serializer for navbar (main) categories with nested subcategories."""
     href = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     subcategories = serializers.SerializerMethodField()
 
     class Meta:
-        model = Category
+        model = NavbarCategory
         fields = ['id', 'name', 'slug', 'description', 'image', 'href', 'order', 'subcategories']
 
     def get_href(self, obj):
@@ -115,31 +113,29 @@ class CategorySerializer(serializers.ModelSerializer):
         return _image_url(obj.image, self.context.get('request'))
 
     def get_subcategories(self, obj):
-        """Return all active subcategories for this main category."""
+        """Return all active subcategories for this navbar category."""
         subcats = obj.get_subcategories()
         return SubcategorySerializer(subcats, many=True, context=self.context).data
 
 
-class CategoryFlatSerializer(serializers.ModelSerializer):
-    """Flat serializer for categories without nested subcategories."""
+class CategorySerializer(serializers.ModelSerializer):
+    """Flat serializer for subcategories."""
     href = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
-    parentSlug = serializers.SerializerMethodField()
+    navbarCategorySlug = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'image', 'href', 'order', 'parentSlug']
+        fields = ['id', 'name', 'slug', 'image', 'href', 'order', 'navbarCategorySlug']
 
     def get_href(self, obj):
-        if obj.parent:
-            return f"/{obj.parent.slug}?type={obj.slug}"
-        return f"/{obj.slug}"
+        return f"/{obj.navbar_category.slug}?type={obj.slug}"
 
     def get_image(self, obj):
         return _image_url(obj.image, self.context.get('request'))
 
-    def get_parentSlug(self, obj):
-        return obj.parent.slug if obj.parent else None
+    def get_navbarCategorySlug(self, obj):
+        return obj.navbar_category.slug
 
 
 class BrandSerializer(serializers.ModelSerializer):

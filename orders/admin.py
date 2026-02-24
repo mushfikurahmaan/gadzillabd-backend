@@ -1,6 +1,8 @@
 from django.contrib import admin
 from .models import Order, OrderItem
 
+from config.admin_site import custom_admin_site
+
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -14,7 +16,7 @@ class OrderItemInline(admin.TabularInline):
         return getattr(obj.product, 'name', '') or str(obj.product_id)
 
 
-@admin.register(Order)
+@admin.register(Order, site=custom_admin_site)
 class OrderAdmin(admin.ModelAdmin):
     # Phone-based checkout: hide user/email, show phone + delivery area.
     list_display = ['product_names', 'shipping_name', 'phone', 'delivery_area', 'status', 'total', 'created_at']

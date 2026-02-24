@@ -10,7 +10,13 @@ urlpatterns = [
     path('<str:identifier>/related/', views.ProductRelatedView.as_view(), name='product-related'),
 ]
 
-# Category URL patterns (to be included in main urls.py)
+# Navbar category URL patterns — main navigation categories
+navbar_category_urlpatterns = [
+    path('', views.NavbarCategoryListView.as_view(), name='navbar-category-list'),
+    path('<slug:slug>/', views.NavbarCategoryDetailView.as_view(), name='navbar-category-detail'),
+]
+
+# Category (subcategory) URL patterns
 category_urlpatterns = [
     path('', views.CategoryListView.as_view(), name='category-list'),
     path('<slug:slug>/', views.CategoryDetailView.as_view(), name='category-detail'),

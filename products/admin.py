@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django import forms
-from .models import Brand, Category, Product, ProductImage
+from .models import Brand, Category, NavbarCategory, Product, ProductImage
+
+from config.admin_site import custom_admin_site
 
 
 class ProductImageInline(admin.TabularInline):
@@ -9,21 +11,21 @@ class ProductImageInline(admin.TabularInline):
 
 
 class ProductAdminForm(forms.ModelForm):
-    """Custom form to filter subcategory choices based on selected category."""
+    """Custom form to filter subcategory choices based on selected navbar category."""
     class Meta:
         model = Product
         fields = '__all__'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Only show main categories (parent=null) for the category field
-        self.fields['category'].queryset = Category.objects.filter(parent__isnull=True, is_active=True)
-        # Show all subcategories initially; will be filtered by JavaScript in admin
-        self.fields['sub_category'].queryset = Category.objects.filter(parent__isnull=False, is_active=True)
+        # category field now uses NavbarCategory
+        self.fields['category'].queryset = NavbarCategory.objects.filter(is_active=True)
+        # sub_category shows all active subcategories; filtered by JavaScript in admin
+        self.fields['sub_category'].queryset = Category.objects.filter(is_active=True).select_related('navbar_category')
         self.fields['sub_category'].required = False
 
 
-@admin.register(Product)
+@admin.register(Product, site=custom_admin_site)
 class ProductAdmin(admin.ModelAdmin):
     form = ProductAdminForm
     list_display = ['name', 'brand', 'get_category', 'get_sub_category', 'price', 'stock', 'badge', 'is_featured', 'is_active']
@@ -60,29 +62,40 @@ class ProductAdmin(admin.ModelAdmin):
     get_sub_category.admin_order_field = 'sub_category__name'
 
 
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug', 'parent', 'order', 'is_active', 'product_count']
-    list_filter = ['parent', 'is_active']
+@admin.register(NavbarCategory, site=custom_admin_site)
+class NavbarCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'order', 'is_active', 'subcategory_count']
     list_editable = ['order', 'is_active']
     search_fields = ['name', 'slug']
     prepopulated_fields = {'slug': ('name',)}
-    ordering = ['parent__name', 'order', 'name']
+    ordering = ['order', 'name']
+
+    def subcategory_count(self, obj):
+        count = obj.subcategories.count()
+        return f"{count} subcategories"
+    subcategory_count.short_description = 'Subcategories'
+
+
+@admin.register(Category, site=custom_admin_site)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'navbar_category', 'order', 'is_active', 'product_count']
+    list_filter = ['navbar_category', 'is_active']
+    list_editable = ['order', 'is_active']
+    search_fields = ['name', 'slug']
+    prepopulated_fields = {'slug': ('name',)}
+    ordering = ['navbar_category__name', 'order', 'name']
+    autocomplete_fields = ['navbar_category']
 
     def product_count(self, obj):
-        """Count products in this category (as main or subcategory)."""
-        main_count = obj.products.count()
-        sub_count = obj.subcategory_products.count()
-        if obj.parent is None:
-            return f"{main_count} products"
-        return f"{sub_count} products"
+        count = obj.subcategory_products.count()
+        return f"{count} products"
     product_count.short_description = 'Products'
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('parent')
+        return super().get_queryset(request).select_related('navbar_category')
 
 
-@admin.register(Brand)
+@admin.register(Brand, site=custom_admin_site)
 class BrandAdmin(admin.ModelAdmin):
     list_display = ['name', 'brand_type', 'order', 'is_active', 'redirect_url_preview', 'created_at']
     list_filter = ['brand_type', 'is_active']
@@ -105,7 +118,6 @@ class BrandAdmin(admin.ModelAdmin):
     )
 
     def redirect_url_preview(self, obj):
-        """Show a shortened version of the redirect URL."""
         url = obj.redirect_url
         if len(url) > 40:
             return f"{url[:40]}..."

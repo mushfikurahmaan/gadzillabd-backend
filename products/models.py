@@ -10,21 +10,50 @@ except Exception:  # pragma: no cover
         pass
 
 
+class NavbarCategory(models.Model):
+    """
+    Top-level navigation categories displayed in the site navbar.
+
+    Examples: Gadgets, Accessories (and any future main categories).
+    Managed entirely from the admin panel — no frontend code changes needed
+    to add new navbar categories.
+    """
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, help_text="Category description for the frontend")
+    image = models.ImageField(upload_to='navbar_categories/', blank=True, null=True)
+    order = models.PositiveIntegerField(default=0, help_text="Display order in navigation")
+    is_active = models.BooleanField(default=True, help_text="Whether this category is visible on the site")
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Navbar Category'
+        verbose_name_plural = 'Navbar Categories'
+
+    def __str__(self):
+        return self.name
+
+    def get_subcategories(self):
+        """Returns all active subcategories for this navbar category."""
+        return self.subcategories.filter(is_active=True).order_by('order', 'name')
+
+
 class Category(models.Model):
     """
-    Hierarchical categories for products.
-    
-    Main categories (parent=null): e.g. Gadgets, Accessories
-    Subcategories (parent set): e.g. Audio, Wearables, Chargers, Power Bank
-    
-    Categories are fully dynamic and can be managed from the admin panel.
+    Subcategories that live under a NavbarCategory.
+
+    Examples: Audio, Wearables (under Gadgets); Chargers, Cables (under Accessories).
+    Can be managed from the admin panel without any frontend code changes.
     """
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True, help_text="Category description for the frontend")
     image = models.ImageField(upload_to='categories/', blank=True, null=True)
-    parent = models.ForeignKey(
-        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='children'
+    navbar_category = models.ForeignKey(
+        NavbarCategory,
+        on_delete=models.CASCADE,
+        related_name='subcategories',
+        help_text="The navbar (main) category this subcategory belongs to"
     )
     order = models.PositiveIntegerField(default=0, help_text="Display order in navigation")
     is_active = models.BooleanField(default=True, help_text="Whether this category is visible on the site")
@@ -34,18 +63,7 @@ class Category(models.Model):
         verbose_name_plural = 'Categories'
 
     def __str__(self):
-        if self.parent:
-            return f"{self.parent.name} > {self.name}"
-        return self.name
-
-    @property
-    def is_main_category(self):
-        """Returns True if this is a top-level category."""
-        return self.parent is None
-
-    def get_subcategories(self):
-        """Returns all active subcategories for this category."""
-        return self.children.filter(is_active=True).order_by('order', 'name')
+        return f"{self.navbar_category.name} > {self.name}"
 
 
 class Product(models.Model):
@@ -69,10 +87,10 @@ class Product(models.Model):
         max_length=10, choices=Badge.choices, blank=True, null=True
     )
     category = models.ForeignKey(
-        Category,
+        NavbarCategory,
         on_delete=models.PROTECT,
         related_name='products',
-        help_text="Main category (e.g., Gadgets, Accessories)"
+        help_text="Main navbar category (e.g., Gadgets, Accessories)"
     )
     sub_category = models.ForeignKey(
         Category,
@@ -100,13 +118,12 @@ class Product(models.Model):
 
     def clean(self):
         """
-        Ensure sub_category belongs to the selected main category.
+        Ensure sub_category belongs to the selected navbar category.
         """
         super().clean()
 
         if self.sub_category and self.category:
-            # Subcategory must be a child of the selected main category
-            if self.sub_category.parent_id != self.category.id:
+            if self.sub_category.navbar_category_id != self.category.id:
                 raise ValidationError({
                     'sub_category': f'Subcategory must belong to {self.category.name}.'
                 })
@@ -114,36 +131,32 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate slug from name - always update when name changes
         from django.utils.text import slugify
-        
-        # Always generate slug from current name
+
         base_slug = slugify(self.name)
-        
+
         if not base_slug:
-            # If name doesn't produce a valid slug, use a fallback
             base_slug = f"product-{self.id}" if self.pk else "product"
-        
+
         self.slug = base_slug
-        
-        # Ensure uniqueness by appending a number if needed
+
         queryset = Product.objects.all()
         if self.pk:
             queryset = queryset.exclude(pk=self.pk)
-        
+
         counter = 1
         original_slug = self.slug
         while queryset.filter(slug=self.slug).exists():
             self.slug = f"{original_slug}-{counter}"
             counter += 1
-        
-        # Keep model-level validation consistent across admin / scripts.
+
         self.full_clean()
         return super().save(*args, **kwargs)
-    
+
     @property
     def category_slug(self):
-        """Returns the main category slug for URL generation."""
+        """Returns the navbar category slug for URL generation."""
         return self.category.slug if self.category else None
-    
+
     @property
     def sub_category_slug(self):
         """Returns the subcategory slug for URL generation."""

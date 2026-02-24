@@ -1,8 +1,10 @@
 from django.contrib import admin
 from .models import Notification
 
+from config.admin_site import custom_admin_site
 
-@admin.register(Notification)
+
+@admin.register(Notification, site=custom_admin_site)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ['text', 'notification_type', 'is_active', 'order', 'start_date', 'end_date', 'created_at']
     list_filter = ['notification_type', 'is_active', 'created_at']

@@ -4,6 +4,8 @@ from .models import ContactSubmission
 
 
 class ContactSubmissionSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(required=False, allow_blank=True, default='')
+
     class Meta:
         model = ContactSubmission
-        fields = ['name', 'email', 'message']
+        fields = ['name', 'phone', 'email', 'message']

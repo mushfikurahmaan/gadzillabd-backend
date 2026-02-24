@@ -32,12 +32,12 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'storages',
-    'products',
-    'wishlist',
-    'cart',
     'orders',
-    'contact',
+    'products',
     'notifications',
+    'cart',
+    'wishlist',
+    'contact',
 ]
 
 # Middleware
