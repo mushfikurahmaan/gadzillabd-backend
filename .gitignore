@@ -16,6 +16,11 @@ db.sqlite3
 media/
 staticfiles/
 
+# Local development
+config/settings_local.py
+db_local.sqlite3
+media_local/
+
 # IDE
 .idea/
 .vscode/
