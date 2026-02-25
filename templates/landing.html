@@ -1,0 +1,432 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GADZILLA | API Server</title>
+  <style>
+    @font-face {
+      font-family: 'Futura PT';
+      src: url("{% static 'fonts/FuturaCyrillicLight.ttf' %}") format('truetype');
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'Futura PT';
+      src: url("{% static 'fonts/FuturaCyrillicBook.ttf' %}") format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: 'Futura PT', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 300;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #111827;
+      background-color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Content ── */
+    .content {
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+      animation: fadeInUp 0.5s ease forwards;
+    }
+
+    .status-code {
+      font-size: 3.75rem;
+      font-weight: 300;
+      color: #ff4444;
+      line-height: 1;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .title {
+      font-size: 1.875rem;
+      font-weight: 300;
+      color: #111827;
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .message {
+      font-size: 1rem;
+      font-weight: 300;
+      color: #6B7280;
+      line-height: 1.6;
+      margin-bottom: 48px;
+    }
+
+    /* ── Buttons ── */
+    .actions {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 16px;
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto;
+    }
+
+    .cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 16px 32px;
+      font-size: 0.875rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background-color: #ff4444;
+      color: #ffffff;
+      border: 2px solid #ff4444;
+      transition: all 150ms ease;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .cta:hover {
+      background-color: #cc3333;
+      border-color: #cc3333;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+      color: #ffffff;
+    }
+
+    .cta:active { transform: translateY(0); }
+
+    .admin-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 16px 32px;
+      font-size: 0.875rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6B7280;
+      border: 2px solid #E5E7EB;
+      background: none;
+      transition: all 150ms ease;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .admin-btn:hover {
+      color: #111827;
+      border-color: #111827;
+    }
+
+    /* ── Admin challenge panel ── */
+    .admin-panel {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 350ms ease, opacity 300ms ease;
+      margin-top: 0;
+    }
+
+    .admin-panel.open {
+      max-height: 200px;
+      opacity: 1;
+      margin-top: 16px;
+    }
+
+    .admin-panel-inner {
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto;
+    }
+
+    .path-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6B7280;
+      margin-bottom: 8px;
+      text-align: left;
+    }
+
+    .path-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .path-input {
+      flex: 1;
+      padding: 12px 14px;
+      font-size: 0.875rem;
+      font-weight: 300;
+      font-family: inherit;
+      color: #111827;
+      background: #ffffff;
+      border: 2px solid #E5E7EB;
+      outline: none;
+      transition: border-color 150ms ease;
+    }
+
+    .path-input:focus {
+      border-color: #111827;
+    }
+
+    .path-input.error {
+      border-color: #ff4444;
+      animation: shake 350ms ease;
+    }
+
+    .path-go-btn {
+      padding: 12px 20px;
+      font-size: 0.875rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: inherit;
+      color: #ffffff;
+      background-color: #111827;
+      border: 2px solid #111827;
+      cursor: pointer;
+      transition: all 150ms ease;
+      white-space: nowrap;
+    }
+
+    .path-go-btn:hover {
+      background-color: #374151;
+      border-color: #374151;
+    }
+
+    .path-go-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .path-error-msg {
+      font-size: 0.8rem;
+      font-weight: 300;
+      color: #ff4444;
+      margin-top: 8px;
+      text-align: left;
+      min-height: 1.2em;
+      opacity: 0;
+      transition: opacity 150ms ease;
+    }
+
+    .path-error-msg.visible {
+      opacity: 1;
+    }
+
+    /* ── Success panel ── */
+    .success-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto;
+      animation: fadeInUp 0.3s ease forwards;
+    }
+
+    .success-panel.visible {
+      display: flex;
+    }
+
+    .success-msg {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: #059669;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 2px;
+      background-color: #E5E7EB;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #059669;
+      transition: width 1.5s linear;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%      { transform: translateX(-6px); }
+      40%      { transform: translateX(6px); }
+      60%      { transform: translateX(-4px); }
+      80%      { transform: translateX(4px); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .status-code { font-size: 3rem; }
+      .title       { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="content">
+
+    <p class="status-code">Oops!</p>
+
+    <h1 class="title">You&rsquo;ve landed on the wrong page.</h1>
+
+    <p class="message">
+      This is the Gadzilla API server &mdash; it doesn&rsquo;t serve any web pages here.
+      Head over to our website to browse gadgets and accessories.
+    </p>
+
+    <div class="actions" id="actions">
+      <a href="https://www.gadzillabd.com" class="cta">Go to Gadzilla</a>
+
+      <button class="admin-btn" id="admin-btn" onclick="toggleAdminPanel()">Admin Log In</button>
+    </div>
+
+    <!-- Path challenge panel -->
+    <div class="admin-panel" id="admin-panel">
+      <div class="admin-panel-inner">
+        <span class="path-label">Enter admin panel path</span>
+        <div class="path-input-row">
+          <input
+            type="text"
+            class="path-input"
+            id="path-input"
+            autocomplete="off"
+            spellcheck="false"
+            onkeydown="handleKey(event)"
+          />
+          <button class="path-go-btn" id="go-btn" onclick="verifyPath()">Go</button>
+        </div>
+        <p class="path-error-msg" id="error-msg">Incorrect path &mdash; try again.</p>
+      </div>
+    </div>
+
+    <!-- Success panel (replaces actions + challenge panel) -->
+    <div class="success-panel" id="success-panel">
+      <p class="success-msg" id="success-msg">Access granted &mdash; redirecting&hellip;</p>
+      <div class="progress-track">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleAdminPanel() {
+      const panel = document.getElementById('admin-panel');
+      const input = document.getElementById('path-input');
+      const isOpen = panel.classList.contains('open');
+
+      if (isOpen) {
+        panel.classList.remove('open');
+      } else {
+        panel.classList.add('open');
+        setTimeout(() => input.focus(), 320);
+      }
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter') verifyPath();
+    }
+
+    async function verifyPath() {
+      const input  = document.getElementById('path-input');
+      const goBtn  = document.getElementById('go-btn');
+      const errMsg = document.getElementById('error-msg');
+      const path   = input.value.trim();
+
+      if (!path) {
+        showError(input, errMsg, 'Please enter a path.');
+        return;
+      }
+
+      goBtn.disabled = true;
+      errMsg.classList.remove('visible');
+      input.classList.remove('error');
+
+      try {
+        const res  = await fetch('/api/verify-admin-path/?path=' + encodeURIComponent(path));
+        const data = await res.json();
+
+        if (data.match) {
+          showSuccess(path);
+        } else {
+          showError(input, errMsg, 'Incorrect path \u2014 try again.');
+          goBtn.disabled = false;
+        }
+      } catch (_) {
+        showError(input, errMsg, 'Something went wrong. Please retry.');
+        goBtn.disabled = false;
+      }
+    }
+
+    function showError(input, errMsg, message) {
+      input.classList.remove('error');
+      void input.offsetWidth; // reflow to restart animation
+      input.classList.add('error');
+      errMsg.textContent = message;
+      errMsg.classList.add('visible');
+    }
+
+    function showSuccess(path) {
+      // Normalise to an absolute path
+      const redirectTo = path.startsWith('/') ? path : '/' + path;
+
+      document.getElementById('actions').style.display      = 'none';
+      document.getElementById('admin-panel').style.display  = 'none';
+
+      const successPanel = document.getElementById('success-panel');
+      successPanel.classList.add('visible');
+
+      // Kick off progress bar after one frame so the transition fires
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById('progress-bar').style.width = '100%';
+        });
+      });
+
+      setTimeout(() => { window.location.href = redirectTo; }, 1500);
+    }
+  </script>
+
+</body>
+</html>

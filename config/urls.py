@@ -1,6 +1,9 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
+from django.views.generic import TemplateView
+
+from config.views import verify_admin_path
 
 from config.admin_site import custom_admin_site
 
@@ -14,6 +17,8 @@ from products.urls import (
 )
 
 urlpatterns = [
+    path('', TemplateView.as_view(template_name='landing.html'), name='landing'),
+    path('api/verify-admin-path/', verify_admin_path, name='verify_admin_path'),
     # Admin URL is configurable via ADMIN_URL_PATH environment variable
     path(settings.ADMIN_URL_PATH, custom_admin_site.urls),
     # Auth (JWT)
