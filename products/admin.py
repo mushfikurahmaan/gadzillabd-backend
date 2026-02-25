@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django import forms
+from django.utils.html import mark_safe
 from .models import Brand, Category, NavbarCategory, Product, ProductImage
 
 from config.admin_site import custom_admin_site
@@ -85,6 +86,25 @@ class CategoryAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     ordering = ['navbar_category__name', 'order', 'name']
     autocomplete_fields = ['navbar_category']
+    readonly_fields = ['image_preview']
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'slug', 'navbar_category', 'description')
+        }),
+        ('Media', {
+            'fields': ('image', 'image_preview'),
+            'description': 'This image is displayed in the mobile hamburger navigation menu.',
+        }),
+        ('Display', {
+            'fields': ('order', 'is_active')
+        }),
+    )
+
+    def image_preview(self, obj):
+        if obj.image:
+            return mark_safe(f'<img src="{obj.image.url}" style="max-height:120px; border-radius:6px;" />')
+        return '(no image uploaded)'
+    image_preview.short_description = 'Current Image'
 
     def product_count(self, obj):
         count = obj.subcategory_products.count()
