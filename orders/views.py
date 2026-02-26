@@ -156,15 +156,20 @@ class DirectOrderCreateView(CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Phone-based checkout: email is optional (use user's email if authenticated).
-        email = ''
-        if request.user.is_authenticated:
+        # Email: use form-provided value, fall back to authenticated user's email.
+        email = (ser.validated_data.get('email') or '').strip()
+        if not email and request.user.is_authenticated:
             email = (getattr(request.user, 'email', '') or '').strip()
-        
-        # Calculate shipping cost
-        delivery_area = ser.validated_data['delivery_area']
-        shipping_cost = Decimal('40.00') if delivery_area == 'inside' else Decimal('150.00')
-        
+
+        # Derive delivery_area server-side from district for consistency.
+        district = (ser.validated_data.get('district') or '').strip()
+        if district:
+            delivery_area = 'inside' if district == 'Dhaka' else 'outside'
+        else:
+            delivery_area = ser.validated_data['delivery_area']
+
+        shipping_cost = Decimal('60.00') if delivery_area == 'inside' else Decimal('150.00')
+
         # Create order and reduce stock
         total = Decimal('0.00')
         order = Order.objects.create(
@@ -173,7 +178,8 @@ class DirectOrderCreateView(CreateAPIView):
             shipping_name=ser.validated_data['shipping_name'],
             shipping_address=ser.validated_data['shipping_address'],
             phone=ser.validated_data['phone'],
-            delivery_area=ser.validated_data['delivery_area'],
+            district=district,
+            delivery_area=delivery_area,
         )
         
         for product_data in products_data:

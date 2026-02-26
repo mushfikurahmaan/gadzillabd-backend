@@ -21,7 +21,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'status', 'total', 'shipping_name', 'shipping_address',
-            'phone', 'delivery_area', 'delivery_area_label',
+            'phone', 'email', 'district', 'delivery_area', 'delivery_area_label',
             'tracking_number', 'created_at', 'updated_at', 'items',
         ]
 
@@ -46,7 +46,9 @@ class DirectOrderCreateSerializer(serializers.Serializer):
     """Serializer for creating orders directly with products (not from cart)."""
     shipping_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(max_length=20)
+    email = serializers.EmailField(required=False, allow_blank=True, default='')
     shipping_address = serializers.CharField()
+    district = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     delivery_area = serializers.ChoiceField(choices=['inside', 'outside'])
     products = serializers.ListField(
         child=serializers.DictField(),

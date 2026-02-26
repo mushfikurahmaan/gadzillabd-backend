@@ -43,6 +43,7 @@ class Order(models.Model):
         default=DeliveryArea.INSIDE,
         blank=True,
     )
+    district = models.CharField(max_length=100, blank=True, default='')
     tracking_number = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
