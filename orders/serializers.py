@@ -61,9 +61,15 @@ class DirectOrderCreateSerializer(serializers.Serializer):
         return value.strip()
 
     def validate_phone(self, value):
-        if not (value or '').strip():
+        raw = (value or '').strip()
+        if not raw:
             raise serializers.ValidationError('Required.')
-        return value.strip()
+        digits = ''.join(c for c in raw if c.isdigit())
+        if len(digits) != 11 or not digits.startswith('01'):
+            raise serializers.ValidationError(
+                'Phone must be 11 digits, start with 01, and contain only numbers.'
+            )
+        return digits
 
     def validate_shipping_address(self, value):
         if not (value or '').strip():
