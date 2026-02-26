@@ -6,6 +6,8 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from meta_pixel.service import meta_conversions
+
 from .models import Brand, Category, NavbarCategory, Product
 from .serializers import (
     BrandSerializer,
@@ -68,6 +70,12 @@ class ProductDetailView(RetrieveAPIView):
             return get_object_or_404(qs, id=identifier)
         except Exception:
             return get_object_or_404(qs, slug=identifier)
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        product = self.get_object()
+        meta_conversions.track_view_content(request, product)
+        return response
 
 
 class ProductRelatedView(ListAPIView):
@@ -209,3 +217,10 @@ class ProductSearchView(ListAPIView):
         )
 
         return qs.order_by('name')[:10]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        query = request.query_params.get('q', '').strip()
+        if query and len(query) >= 2:
+            meta_conversions.track_search(request, query)
+        return response

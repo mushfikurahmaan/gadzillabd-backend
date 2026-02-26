@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'cart',
     'wishlist',
     'contact',
+    'meta_pixel',
 ]
 
 # Middleware
@@ -196,6 +197,17 @@ STORAGES = {
         'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
+
+
+# =============================================================================
+# META CONVERSIONS API
+# =============================================================================
+
+META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '')
+META_ACCESS_TOKEN = os.environ.get('META_ACCESS_TOKEN', '')
+META_API_VERSION = os.environ.get('META_API_VERSION', 'v25.0')
+# Set META_TEST_EVENT_CODE during testing to route events to the Test Events tool
+META_TEST_EVENT_CODE = os.environ.get('META_TEST_EVENT_CODE', '')
 
 
 # =============================================================================

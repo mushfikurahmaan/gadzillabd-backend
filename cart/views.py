@@ -3,6 +3,7 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from meta_pixel.service import meta_conversions
 from products.models import Product
 
 from .models import Cart, CartItem
@@ -50,6 +51,8 @@ class CartAddView(APIView):
         if not created:
             item.quantity = quantity
             item.save(update_fields=['quantity', 'updated_at'])
+
+        meta_conversions.track_add_to_cart(request, product, quantity)
 
         return Response(
             CartItemSerializer(instance=item, context={'request': request}).data,

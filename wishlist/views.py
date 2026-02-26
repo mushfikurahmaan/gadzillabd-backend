@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from meta_pixel.service import meta_conversions
 from products.models import Product
 
 from .models import WishlistItem
@@ -32,6 +33,8 @@ class WishlistAddView(APIView):
         _, created = WishlistItem.objects.get_or_create(
             user=request.user, product=product
         )
+        if created:
+            meta_conversions.track_add_to_wishlist(request, product)
         return Response(
             {'status': 'added', 'created': created},
             status=status.HTTP_201_CREATED

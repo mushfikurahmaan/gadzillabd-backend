@@ -6,8 +6,10 @@ from rest_framework.exceptions import NotFound
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from cart.views import get_or_create_cart
+from meta_pixel.service import meta_conversions
 
 from .models import Order, OrderItem
 from .serializers import OrderCreateSerializer, OrderSerializer, DirectOrderCreateSerializer
@@ -80,10 +82,12 @@ class OrderCreateView(CreateAPIView):
         order.total = total
         order.save(update_fields=['total'])
         cart.items.all().delete()
-        
+
         # Email notification disabled - removed for now
         # TODO: Re-enable when email service is configured
-        
+
+        meta_conversions.track_purchase(request, order)
+
         return Response(
             OrderSerializer(instance=order, context={'request': request}).data,
             status=status.HTTP_201_CREATED
@@ -190,10 +194,17 @@ class DirectOrderCreateView(CreateAPIView):
         total += shipping_cost
         order.total = total
         order.save(update_fields=['total'])
-        
+
         # Email notification disabled - removed for now
         # TODO: Re-enable when email service is configured
-        
+
+        meta_conversions.track_add_payment_info(request, {
+            'email': order.email,
+            'phone': order.phone,
+            'shipping_name': order.shipping_name,
+        })
+        meta_conversions.track_purchase(request, order)
+
         return Response(
             OrderSerializer(instance=order, context={'request': request}).data,
             status=status.HTTP_201_CREATED
@@ -230,3 +241,17 @@ class OrderDetailView(RetrieveAPIView):
             if not email or order.email.lower() != email:
                 raise NotFound()
         return order
+
+
+class InitiateCheckoutView(APIView):
+    """
+    Signal the start of the checkout flow.
+    Called by the frontend when the user navigates to the checkout page.
+    Fires an InitiateCheckout event to Meta Conversions API and returns 200.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        meta_conversions.track_initiate_checkout(request)
+        return Response({'status': 'ok'})
