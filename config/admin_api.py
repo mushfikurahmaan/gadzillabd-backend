@@ -1,6 +1,9 @@
 from decimal import Decimal
+from datetime import date, timedelta
 
 from django.db.models import Sum, Count, Q
+from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -12,7 +15,7 @@ from orders.admin_serializers import AdminOrderListSerializer
 from products.models import Product, NavbarCategory, Category, Brand
 from contact.models import ContactSubmission
 from notifications.models import Notification
-from cart.models import Cart
+from cart.models import Cart, CartItem
 from wishlist.models import WishlistItem
 
 
@@ -60,6 +63,155 @@ class DashboardStatsView(APIView):
             'carts': Cart.objects.filter(items__isnull=False).distinct().count(),
             'wishlist': WishlistItem.objects.count(),
             'recent_orders': AdminOrderListSerializer(recent_orders, many=True).data,
+        })
+
+
+class DashboardAnalyticsView(APIView):
+    """
+    Date-filtered summary and time-series stats for the admin dashboard.
+
+    This endpoint is separate from DashboardStatsView to avoid changing the
+    existing global counters used in the UI navigation.
+    """
+
+    permission_classes = [IsStaffUser]
+
+    def _parse_date_range(self, request) -> tuple[date, date]:
+        """Parse start/end date from query params, defaulting to the last 30 days."""
+        today = timezone.localdate()
+        default_start = today - timedelta(days=29)
+
+        start_str = request.query_params.get('start_date')
+        end_str = request.query_params.get('end_date')
+
+        start_date = default_start
+        end_date = today
+
+        try:
+            if start_str:
+                start_date = date.fromisoformat(start_str)
+            if end_str:
+                end_date = date.fromisoformat(end_str)
+        except ValueError:
+            # Fallback silently to defaults on parsing errors.
+            start_date = default_start
+            end_date = today
+
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+
+        return start_date, end_date
+
+    def _get_bucket_func(self, bucket: str):
+        bucket = (bucket or "day").lower()
+        if bucket == "week":
+            return TruncWeek
+        if bucket == "month":
+            return TruncMonth
+        return TruncDate
+
+    def get(self, request):
+        start_date, end_date = self._parse_date_range(request)
+        bucket = request.query_params.get('bucket', 'day')
+        bucket_func = self._get_bucket_func(bucket)
+
+        # Filter base querysets by date range (inclusive).
+        order_qs = Order.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
+        product_qs = Product.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
+        cart_item_qs = CartItem.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
+        wishlist_qs = WishlistItem.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
+        contact_qs = ContactSubmission.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
+
+        summary = {
+            'totalOrders': order_qs.count(),
+            'totalProducts': product_qs.count(),
+            'totalCartItems': cart_item_qs.count(),
+            'totalWishlistItems': wishlist_qs.count(),
+            'totalContacts': contact_qs.count(),
+        }
+
+        # Build time-series across all entities keyed by bucket label.
+        series_map: dict[str, dict] = {}
+
+        def _update_series(qs, key: str):
+            for row in qs.annotate(
+                period=bucket_func('created_at')
+            ).values('period').annotate(total=Count('id')).order_by('period'):
+                period = row['period']
+                if period is None:
+                    continue
+                # Normalize to ISO date string for frontend.
+                label = getattr(period, 'date', lambda: period)()
+                label_str = label.isoformat()
+                entry = series_map.setdefault(
+                    label_str,
+                    {
+                        'label': label_str,
+                        'orders': 0,
+                        'products': 0,
+                        'cartItems': 0,
+                        'wishlistItems': 0,
+                        'contacts': 0,
+                    },
+                )
+                entry[key] = row['total']
+
+        _update_series(order_qs, 'orders')
+        _update_series(product_qs, 'products')
+        _update_series(cart_item_qs, 'cartItems')
+        _update_series(wishlist_qs, 'wishlistItems')
+        _update_series(contact_qs, 'contacts')
+
+        # Sort existing buckets.
+        series = sorted(series_map.values(), key=lambda x: x['label'])
+
+        # Ensure full date coverage for day bucket by filling gaps with zeros.
+        if (bucket or "day").lower() == "day":
+            filled_series = []
+            current = start_date
+            end_inclusive = end_date
+            by_label = {entry['label']: entry for entry in series}
+
+            while current <= end_inclusive:
+                label_str = current.isoformat()
+                entry = by_label.get(label_str)
+                if not entry:
+                    entry = {
+                        'label': label_str,
+                        'orders': 0,
+                        'products': 0,
+                        'cartItems': 0,
+                        'wishlistItems': 0,
+                        'contacts': 0,
+                    }
+                filled_series.append(entry)
+                current += timedelta(days=1)
+
+            series = filled_series
+
+        return Response({
+            'summary': summary,
+            'series': series,
+            'meta': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'bucket': bucket,
+            },
         })
 
 
